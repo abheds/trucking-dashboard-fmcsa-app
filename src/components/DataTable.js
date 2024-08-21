@@ -1,45 +1,96 @@
-import React, { useEffect, useRef } from "react";
+import React, { useEffect, useMemo, useState, useCallback } from "react";
 import {
   useTable,
-  usePagination,
-  useFilters,
   useSortBy,
+  usePagination,
   useGlobalFilter,
+  useFilters,
 } from "react-table";
 import {
   Table,
   TableBody,
   TableCell,
+  TableContainer,
   TableHead,
   TableRow,
-  TableContainer,
-  TablePagination,
   Paper,
+  TablePagination,
 } from "@mui/material";
+import { useDrag, useDrop, DndProvider } from "react-dnd";
+import { HTML5Backend } from "react-dnd-html5-backend";
+import update from "immutability-helper";
 import GlobalFilter from "./GlobalFilter";
 import { format, isValid } from "date-fns";
 
-function DataTable({ columns, data, initialState, onViewChange }) {
+const DraggableHeader = ({ column, index, moveColumn }) => {
+  const ref = React.useRef(null);
+
+  const [, drop] = useDrop({
+    accept: "column",
+    hover(item, monitor) {
+      if (!ref.current) return;
+      const dragIndex = item.index;
+      const hoverIndex = index;
+
+      if (dragIndex === hoverIndex) return;
+
+      const hoverBoundingRect = ref.current.getBoundingClientRect();
+      const hoverMiddleX =
+        (hoverBoundingRect.right - hoverBoundingRect.left) / 2;
+      const clientOffset = monitor.getClientOffset();
+      const hoverClientX = clientOffset.x - hoverBoundingRect.left;
+
+      if (dragIndex < hoverIndex && hoverClientX < hoverMiddleX) return;
+      if (dragIndex > hoverIndex && hoverClientX > hoverMiddleX) return;
+
+      moveColumn(dragIndex, hoverIndex);
+      item.index = hoverIndex;
+    },
+  });
+
+  const [{ isDragging }, drag] = useDrag({
+    type: "column",
+    item: { index },
+    collect: (monitor) => ({
+      isDragging: monitor.isDragging(),
+    }),
+  });
+
+  drag(drop(ref));
+
+  return (
+    <TableCell
+      ref={ref}
+      style={{ opacity: isDragging ? 0.5 : 1 }}
+      {...column.getHeaderProps(column.getSortByToggleProps())}
+      key={column.id}
+    >
+      {column.render("Header")}
+      <span>
+        {column.isSorted ? (column.isSortedDesc ? " 🔽" : " 🔼") : ""}
+      </span>
+    </TableCell>
+  );
+};
+
+const DataTable = ({ columns, data, onViewChange }) => {
+  const [orderedColumns, setColumns] = useState(columns);
   const {
     getTableProps,
     getTableBodyProps,
     headerGroups,
+    rows,
     prepareRow,
     page,
-    state: { pageIndex, pageSize, globalFilter },
-    setGlobalFilter,
+    pageCount,
     gotoPage,
     setPageSize,
-    rows,
+    state: { pageIndex, pageSize, globalFilter },
   } = useTable(
     {
-      columns,
+      columns: orderedColumns,
       data,
-      initialState: {
-        pageIndex: initialState.pageIndex,
-        pageSize: initialState.pageSize,
-        globalFilter: initialState.globalFilter,
-      },
+      initialState: { pageIndex: 0 },
     },
     useFilters,
     useGlobalFilter,
@@ -47,55 +98,45 @@ function DataTable({ columns, data, initialState, onViewChange }) {
     usePagination
   );
 
-  const previousGlobalFilter = useRef(globalFilter);
+  const moveColumn = useCallback(
+    (dragIndex, hoverIndex) => {
+      const draggedColumn = orderedColumns[dragIndex];
+      setColumns(
+        update(orderedColumns, {
+          $splice: [
+            [dragIndex, 1],
+            [hoverIndex, 0, draggedColumn],
+          ],
+        })
+      );
+    },
+    [orderedColumns]
+  );
 
   useEffect(() => {
-    if (previousGlobalFilter.current !== globalFilter) {
-      gotoPage(0); // Reset to first page on search/filter change
+    if (onViewChange) {
+      onViewChange({ pageIndex, pageSize, globalFilter });
     }
-    previousGlobalFilter.current = globalFilter;
-
-    onViewChange({
-      pageIndex,
-      pageSize,
-      globalFilter,
-    });
-  }, [pageIndex, pageSize, globalFilter, onViewChange, gotoPage]);
-
-  const handleGlobalFilterChange = (value) => {
-    setGlobalFilter(value || undefined);
-  };
+  }, [pageIndex, pageSize, globalFilter, onViewChange]);
 
   return (
-    <>
-      <GlobalFilter
-        globalFilter={globalFilter}
-        setGlobalFilter={handleGlobalFilterChange}
-      />
+    <DndProvider backend={HTML5Backend}>
+      <GlobalFilter globalFilter={globalFilter} setGlobalFilter={gotoPage} />
       <TableContainer component={Paper}>
         <Table {...getTableProps()}>
           <TableHead>
-            {headerGroups.map((headerGroup, i) => (
+            {headerGroups.map((headerGroup) => (
               <TableRow
                 {...headerGroup.getHeaderGroupProps()}
-                key={`header-group-${i}`}
-                sx={{ backgroundColor: "#1976d2" }}
+                key={headerGroup.id}
               >
-                {headerGroup.headers.map((column, j) => (
-                  <TableCell
-                    {...column.getHeaderProps(column.getSortByToggleProps())}
-                    key={`header-cell-${j}`}
-                    sx={{ color: "#fff", fontWeight: "bold" }}
-                  >
-                    {column.render("Header")}
-                    <span sx={{ marginLeft: 1 }}>
-                      {column.isSorted
-                        ? column.isSortedDesc
-                          ? " 🔽"
-                          : " 🔼"
-                        : ""}
-                    </span>
-                  </TableCell>
+                {headerGroup.headers.map((column, index) => (
+                  <DraggableHeader
+                    key={column.id}
+                    column={column}
+                    index={index}
+                    moveColumn={moveColumn}
+                  />
                 ))}
               </TableRow>
             ))}
@@ -104,13 +145,9 @@ function DataTable({ columns, data, initialState, onViewChange }) {
             {page.map((row, i) => {
               prepareRow(row);
               return (
-                <TableRow
-                  {...row.getRowProps()}
-                  key={`row-${i}`}
-                  sx={{ "&:nth-of-type(odd)": { backgroundColor: "#f2f2f2" } }}
-                >
-                  {row.cells.map((cell, j) => (
-                    <TableCell {...cell.getCellProps()} key={`cell-${j}`}>
+                <TableRow {...row.getRowProps()} key={i}>
+                  {row.cells.map((cell) => (
+                    <TableCell {...cell.getCellProps()} key={cell.column.id}>
                       {cell.column.Header.toLowerCase().includes("date") &&
                       isValid(new Date(cell.value))
                         ? format(new Date(cell.value), "MM/dd/yyyy HH:mm")
@@ -128,15 +165,11 @@ function DataTable({ columns, data, initialState, onViewChange }) {
         count={rows.length}
         rowsPerPage={pageSize}
         page={pageIndex}
-        onPageChange={(event, newPage) => {
-          gotoPage(newPage); // This should update pageIndex
-        }}
-        onRowsPerPageChange={(event) => {
-          setPageSize(Number(event.target.value)); // This updates pageSize
-        }}
+        onPageChange={(event, newPage) => gotoPage(newPage)}
+        onRowsPerPageChange={(event) => setPageSize(Number(event.target.value))}
       />
-    </>
+    </DndProvider>
   );
-}
+};
 
 export default DataTable;
