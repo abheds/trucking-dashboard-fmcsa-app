@@ -61,7 +61,12 @@ const DraggableHeader = ({ column, index, moveColumn }) => {
   return (
     <TableCell
       ref={ref}
-      style={{ opacity: isDragging ? 0.5 : 1 }}
+      sx={{
+        opacity: isDragging ? 0.5 : 1,
+        backgroundColor: "#1976d2 !important",
+        color: "#fff !important",
+        fontWeight: "bold !important",
+      }}
       {...column.getHeaderProps(column.getSortByToggleProps())}
       key={column.id}
     >
@@ -82,7 +87,7 @@ const DataTable = ({ columns, data, onViewChange }) => {
     rows,
     prepareRow,
     page,
-    pageCount,
+    setGlobalFilter,
     gotoPage,
     setPageSize,
     state: { pageIndex, pageSize, globalFilter },
@@ -121,7 +126,10 @@ const DataTable = ({ columns, data, onViewChange }) => {
 
   return (
     <DndProvider backend={HTML5Backend}>
-      <GlobalFilter globalFilter={globalFilter} setGlobalFilter={gotoPage} />
+      <GlobalFilter
+        globalFilter={globalFilter}
+        setGlobalFilter={setGlobalFilter}
+      />
       <TableContainer component={Paper}>
         <Table {...getTableProps()}>
           <TableHead>
