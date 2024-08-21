@@ -4,7 +4,6 @@ const VIEW_KEY = "userTableView";
 
 export const saveView = async (viewState) => {
   try {
-    console.log({ viewState });
     await localforage.setItem(VIEW_KEY, viewState);
     alert("View saved successfully!");
   } catch (error) {

@@ -1,4 +1,5 @@
-import { useContext, useState, useEffect, useMemo } from "react";
+import { useContext, useEffect, useMemo, useState } from "react";
+import { useLocation, useNavigate } from "react-router-dom";
 import { DataContext } from "../context/dataContext";
 import DataTable from "../components/DataTable";
 import DataChart from "../components/DataChart";
@@ -6,13 +7,11 @@ import PivotTable from "../components/PivotTable";
 import ActionButtons from "../components/ActionButtons";
 import ViewToggle from "../components/ViewToggle";
 import { CircularProgress, Container, Typography, Box } from "@mui/material";
-import { loadView } from "../utils/viewStorage";
-import localforage from "localforage";
 
 const MainView = () => {
   const { data, loading } = useContext(DataContext);
-  const [tableView, setTableView] = useState(null);
-  const [viewMode, setViewMode] = useState("table");
+  const location = useLocation();
+  const navigate = useNavigate();
 
   const columns = useMemo(
     () => [
@@ -29,35 +28,30 @@ const MainView = () => {
     []
   );
 
+  const urlParams = new URLSearchParams(location.search);
+
+  const [tableView, setTableView] = useState({
+    pageIndex: parseInt(urlParams.get("pageIndex"), 10) || 0,
+    pageSize: parseInt(urlParams.get("pageSize"), 10) || 10,
+    globalFilter: urlParams.get("globalFilter") || "",
+  });
+
+  const viewMode = urlParams.get("viewMode") || "table";
+
   useEffect(() => {
-    async function setLocal(params) {
-      await localforage.setItem("local", params);
-    }
+    const params = new URLSearchParams(location.search);
+    params.set("pageIndex", tableView.pageIndex);
+    params.set("pageSize", tableView.pageSize);
+    params.set("globalFilter", tableView.globalFilter || "");
+    params.set("viewMode", viewMode);
+    navigate({ search: params.toString() });
+  }, [tableView, viewMode, navigate]);
 
-    setLocal(tableView);
-  }, [tableView]);
-
-  useEffect(() => {
-    const fetchView = async () => {
-      const urlParams = new URLSearchParams(window.location.search);
-      const savedView = {
-        pageIndex: parseInt(urlParams.get("pageIndex"), 10) || 0,
-        pageSize: parseInt(urlParams.get("pageSize"), 10) || 10,
-        globalFilter: urlParams.get("globalFilter") || "",
-      };
-
-      if (savedView.pageIndex !== null || savedView.pageSize !== null) {
-        setTableView(savedView);
-      } else {
-        const storedView = await loadView();
-        if (storedView) {
-          setTableView(storedView);
-        }
-      }
-    };
-
-    fetchView();
-  }, []);
+  const handleViewModeChange = (newViewMode) => {
+    const params = new URLSearchParams(location.search);
+    params.set("viewMode", newViewMode);
+    navigate({ search: params.toString() });
+  };
 
   return (
     <Container maxWidth="xl" sx={{ padding: "0 20px" }}>
@@ -69,10 +63,10 @@ const MainView = () => {
         }}
       >
         <Typography variant="h4">Trucking Dashboard</Typography>
-        <ViewToggle viewMode={viewMode} setViewMode={setViewMode} />
+        <ViewToggle viewMode={viewMode} setViewMode={handleViewModeChange} />
       </Box>
       <Box sx={{ display: "flex", alignItems: "center" }}>
-        <ActionButtons tableView={tableView} setTableView={setTableView} />
+        <ActionButtons tableView={tableView} />
       </Box>
       {loading ? (
         <Box
@@ -87,21 +81,28 @@ const MainView = () => {
         </Box>
       ) : (
         <Box sx={{ overflowX: "auto", width: "100%" }}>
-          {viewMode === "table" && (
-            <>
-              <DataTable
-                columns={columns}
-                data={data}
-                onViewChange={setTableView}
-              />
-              <DataChart data={data} />
-            </>
-          )}
-          {viewMode === "pivot" && (
-            <Box sx={{ maxWidth: "100%" }}>
-              <PivotTable data={data} onViewChange={setTableView} />
-            </Box>
-          )}
+          <Box
+            sx={{
+              ...{ display: viewMode === "table" ? "block" : "none" },
+            }}
+          >
+            <DataTable
+              columns={columns}
+              data={data}
+              initialState={tableView}
+              onViewChange={setTableView}
+            />
+            <DataChart data={data} />
+          </Box>
+
+          <Box
+            sx={{
+              maxWidth: "100%",
+              ...{ display: viewMode === "pivot" ? "block" : "none" },
+            }}
+          >
+            <PivotTable data={data} />
+          </Box>
         </Box>
       )}
     </Container>

@@ -25,7 +25,7 @@ ChartJS.register(
 const aggregateDataByMonth = (data) => {
   const groupedData = {};
 
-  const startDate = new Date("2020-01-01"); // Example: Start from 2020
+  const startDate = new Date("2020-01-01");
 
   data.forEach((d) => {
     if (d.out_of_service_date) {
@@ -81,7 +81,7 @@ const DataChart = ({ data }) => {
       x: {
         type: "time",
         time: {
-          unit: "quarter", // Change to 'quarter' or 'year' to group data accordingly
+          unit: "quarter",
           tooltipFormat: "MMM yyyy",
         },
         title: {

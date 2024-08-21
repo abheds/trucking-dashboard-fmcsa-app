@@ -1,8 +1,9 @@
 import { Button } from "@mui/material";
 import { saveView, loadView, resetView } from "../utils/viewStorage";
-import { generateShareableLink } from "../utils/shareableLink";
+import { useLocation } from "react-router-dom";
 
 const ActionButtons = ({ tableView, setTableView }) => {
+  const location = useLocation();
   const handleSaveView = () => {
     saveView({ tableView });
   };
@@ -19,9 +20,12 @@ const ActionButtons = ({ tableView, setTableView }) => {
     setTableView(null);
   };
 
-  const handleShareLink = () => {
-    const link = generateShareableLink({ tableView });
-    prompt("Copy this shareable link:", link);
+  const handleCopyLink = () => {
+    const url = new URL(window.location.href);
+    url.search = location.search;
+    navigator.clipboard.writeText(url.toString()).then(() => {
+      alert("Shareable link copied to clipboard!");
+    });
   };
 
   return (
@@ -35,8 +39,8 @@ const ActionButtons = ({ tableView, setTableView }) => {
       <Button variant="contained" color="primary" onClick={handleResetView}>
         Reset to Default
       </Button>
-      <Button variant="contained" color="secondary" onClick={handleShareLink}>
-        Get Shareable Link
+      <Button variant="contained" color="secondary" onClick={handleCopyLink}>
+        Copy Shareable Link
       </Button>
     </div>
   );

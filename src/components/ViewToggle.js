@@ -1,9 +1,9 @@
 import { ToggleButton, ToggleButtonGroup } from "@mui/material";
 
 const ViewToggle = ({ viewMode, setViewMode }) => {
-  const handleViewModeChange = (event, newViewMode) => {
-    if (newViewMode !== null) {
-      setViewMode(newViewMode);
+  const handleViewModeChange = (event, newView) => {
+    if (newView !== null) {
+      setViewMode(newView);
     }
   };
 
@@ -18,7 +18,7 @@ const ViewToggle = ({ viewMode, setViewMode }) => {
       <ToggleButton value="table" aria-label="table view">
         Table View
       </ToggleButton>
-      <ToggleButton value="pivot" aria-label="pivot view">
+      <ToggleButton value="pivot" aria-label="pivot table view">
         Pivot Table View
       </ToggleButton>
     </ToggleButtonGroup>

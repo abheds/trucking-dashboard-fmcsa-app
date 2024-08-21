@@ -1,5 +1,4 @@
-// components/DataTable.js
-import React, { useEffect } from "react";
+import React, { useEffect, useRef } from "react";
 import {
   useTable,
   usePagination,
@@ -20,7 +19,7 @@ import {
 import GlobalFilter from "./GlobalFilter";
 import { format, isValid } from "date-fns";
 
-function DataTable({ columns, data, onViewChange }) {
+function DataTable({ columns, data, initialState, onViewChange }) {
   const {
     getTableProps,
     getTableBodyProps,
@@ -29,12 +28,18 @@ function DataTable({ columns, data, onViewChange }) {
     page,
     state: { pageIndex, pageSize, globalFilter },
     setGlobalFilter,
+    gotoPage,
     setPageSize,
+    rows,
   } = useTable(
     {
       columns,
       data,
-      initialState: { pageIndex: 0 },
+      initialState: {
+        pageIndex: initialState.pageIndex,
+        pageSize: initialState.pageSize,
+        globalFilter: initialState.globalFilter,
+      },
     },
     useFilters,
     useGlobalFilter,
@@ -42,17 +47,30 @@ function DataTable({ columns, data, onViewChange }) {
     usePagination
   );
 
+  const previousGlobalFilter = useRef(globalFilter);
+
   useEffect(() => {
-    if (onViewChange) {
-      onViewChange({ pageIndex, pageSize, globalFilter });
+    if (previousGlobalFilter.current !== globalFilter) {
+      gotoPage(0); // Reset to first page on search/filter change
     }
-  }, [pageIndex, pageSize, globalFilter, onViewChange]);
+    previousGlobalFilter.current = globalFilter;
+
+    onViewChange({
+      pageIndex,
+      pageSize,
+      globalFilter,
+    });
+  }, [pageIndex, pageSize, globalFilter, onViewChange, gotoPage]);
+
+  const handleGlobalFilterChange = (value) => {
+    setGlobalFilter(value || undefined);
+  };
 
   return (
     <>
       <GlobalFilter
         globalFilter={globalFilter}
-        setGlobalFilter={setGlobalFilter}
+        setGlobalFilter={handleGlobalFilterChange}
       />
       <TableContainer component={Paper}>
         <Table {...getTableProps()}>
@@ -107,14 +125,14 @@ function DataTable({ columns, data, onViewChange }) {
       </TableContainer>
       <TablePagination
         component="div"
-        count={data.length}
+        count={rows.length}
         rowsPerPage={pageSize}
         page={pageIndex}
         onPageChange={(event, newPage) => {
-          setPageSize(newPage);
+          gotoPage(newPage); // This should update pageIndex
         }}
         onRowsPerPageChange={(event) => {
-          setPageSize(Number(event.target.value));
+          setPageSize(Number(event.target.value)); // This updates pageSize
         }}
       />
     </>
